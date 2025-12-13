@@ -1,0 +1,19 @@
+{
+  "name": "docker-cicd-learning",
+  "version": "1.0.0",
+  "description": "Monorepo for learning Docker, CI/CD, RabbitMQ",
+  "private": true,
+  "workspaces": [
+    "frontend",
+    "backend",
+    "worker"
+  ],
+  "scripts": {
+    "dev:frontend": "npm run dev --workspace=frontend",
+    "dev:backend": "npm run dev --workspace=backend",
+    "dev:worker": "npm run dev --workspace=worker"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC"
+}
