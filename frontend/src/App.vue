@@ -88,7 +88,7 @@ onUnmounted(stopPolling); // Cleanup khi thoát trang
 
 <template>
   <div class="container">
-    <h1>🚀 Async User Manager</h1>
+    <h1>🚀 Async User Manager v1</h1>
     <p>Architecture: Backend (Queue) → Worker (Delay 2s) → Neon DB</p>
 
     <!-- Thông báo -->
