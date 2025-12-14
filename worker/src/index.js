@@ -1,7 +1,7 @@
 const amqp = require("amqplib");
 const { Pool } = require("pg");
 const express = require("express");
-const ytdl = require("ytdl-core");
+const ytdl = require("@distube/ytdl-core");
 const fs = require("fs");
 const path = require("path");
 const ffmpeg = require("fluent-ffmpeg");
