@@ -98,6 +98,24 @@ const cutVideo = (inputPath, outputPath, startTime, duration) => {
   });
 };
 
+// 5. Upload to file.io
+const uploadToFileIO = (filePath) => {
+  console.log("   --> Uploading to file.io...");
+  const { execSync } = require("child_process");
+  try {
+    // curl -F "file=@/path/to/file" https://file.io
+    // file.io returns {"success":true,"key":"...","link":"https://file.io/..."}
+    const output = execSync(
+      `curl -s -F "file=@${filePath}" https://file.io`
+    ).toString();
+    const json = JSON.parse(output);
+    return json.success ? json.link : "https://upload-failed.com";
+  } catch (e) {
+    console.error("Upload failed", e.message);
+    return "https://upload-error.com";
+  }
+};
+
 // --- MAIN WORKER ---
 async function startWorker() {
   try {
@@ -156,13 +174,17 @@ async function startWorker() {
           );
 
           // 5. Update Status -> COMPLETED
-          // In real prod, upload resultPath to S3/Cloudinary here.
-          // For demo, we just pretend.
-          const fakeResultUrl = "https://example.com/demo_shorts.mp4";
+          // Upload resultPath to file.io
+          let finalLink = "https://error-uploading.com";
+          try {
+            finalLink = uploadToFileIO(resultPath);
+          } catch (e) {
+            console.log("Upload logic error", e);
+          }
 
           await pool.query(
             "UPDATE jobs SET status = 'completed', result_url = $1 WHERE id = $2",
-            [fakeResultUrl, jobId]
+            [finalLink, jobId]
           );
 
           console.log(
