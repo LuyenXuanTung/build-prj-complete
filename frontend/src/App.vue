@@ -2,198 +2,320 @@
 import { ref, onMounted, onUnmounted } from "vue";
 import axios from "axios";
 
-const users = ref([]);
-const newUser = ref({ name: "", email: "" });
+// State
+const jobs = ref([]);
+const youtubeUrl = ref("");
 const loading = ref(false);
 const notification = ref("");
-const pendingCount = ref(0); // Đếm số request đang chờ xử lý
 
-const API_URL = "https://build-prj-api-docker.onrender.com/users";
+const API_URL = "https://build-prj-api-docker.onrender.com/jobs";
 let pollingInterval = null;
 
-// 1. Lấy danh sách users
-const fetchUsers = async () => {
+// 1. Lấy danh sách Jobs
+const fetchJobs = async () => {
   try {
     const response = await axios.get(API_URL);
-    users.value = response.data;
+    jobs.value = response.data;
   } catch (error) {
     console.error("Lỗi lấy danh sách:", error);
   }
 };
 
-// 2. Bật Polling (Tự động reload mỗi 2s)
+// 2. Polling (Tự động cập nhật mỗi 2s)
 const startPolling = () => {
-  if (pollingInterval) return; // Đã bật rồi thì thôi
-
+  if (pollingInterval) return;
   pollingInterval = setInterval(() => {
-    fetchUsers();
-    console.log("🔄 Auto-refreshing...");
-  }, 2000); // Mỗi 2 giây reload 1 lần
+    fetchJobs();
+  }, 2000);
 };
 
-// 3. Tắt Polling
 const stopPolling = () => {
   if (pollingInterval) {
     clearInterval(pollingInterval);
     pollingInterval = null;
-    console.log("⏸️ Polling stopped");
   }
 };
 
-// 4. Thêm user mới
-const addUser = async () => {
-  if (!newUser.value.name || !newUser.value.email)
-    return alert("Nhập đủ thông tin nhé!");
+// 3. Nộp Video mới
+const submitJob = async () => {
+  if (!youtubeUrl.value) return alert("Vui lòng nhập Link YouTube!");
 
   loading.value = true;
-  pendingCount.value++;
-
   try {
-    await axios.post(API_URL, newUser.value);
+    await axios.post(API_URL, { youtubeUrl: youtubeUrl.value });
+    notification.value = "✅ Đã gửi video cho AI xử lý!";
+    youtubeUrl.value = "";
 
-    notification.value = `✅ Đã gửi! Còn ${pendingCount.value} request đang xử lý...`;
-    newUser.value = { name: "", email: "" };
-
-    // Bật Polling để tự động cập nhật
+    // Refresh ngay lập tức & bật polling
+    fetchJobs();
     startPolling();
 
-    // Sau 5 giây (Worker chậm 2s + buffer), giảm pending count
+    // Tắt thông báo sau 3s
     setTimeout(() => {
-      pendingCount.value--;
-      if (pendingCount.value === 0) {
-        notification.value = "";
-        stopPolling(); // Tắt Polling khi hết việc
-      } else {
-        notification.value = `✅ Còn ${pendingCount.value} request đang xử lý...`;
-      }
-    }, 5000);
+      notification.value = "";
+    }, 3000);
   } catch (error) {
     alert("Lỗi gửi yêu cầu!");
-    pendingCount.value--;
+    console.error(error);
   } finally {
     loading.value = false;
   }
 };
 
-// 5. Xóa user
-const deleteUser = async (id) => {
-  if (!confirm("Xóa nhé?")) return;
+// 4. Xóa Job
+const deleteJob = async (id) => {
+  if (!confirm("Xóa lịch sử này?")) return;
   await axios.delete(`${API_URL}/${id}`);
-  await fetchUsers();
+  await fetchJobs();
 };
 
-onMounted(fetchUsers);
-onUnmounted(stopPolling); // Cleanup khi thoát trang
+onMounted(() => {
+  fetchJobs();
+  startPolling(); // Luôn bật polling để xem tiến độ
+});
+
+onUnmounted(stopPolling);
 </script>
 
 <template>
   <div class="container">
-    <h1>🚀 Async User Manager v1</h1>
-    <p>Architecture: Backend (Queue) → Worker (Delay 2s) → Neon DB</p>
+    <header>
+      <h1>🎬 AI Video Repurposing Tool</h1>
+      <p>Biến 1 Video YouTube dài thành 10 Video ngắn (Shorts) tự động</p>
+    </header>
 
-    <!-- Thông báo -->
-    <div v-if="notification" class="notification">
-      {{ notification }}
-      <span class="spinner">⏳</span>
-    </div>
-
-    <!-- Form -->
-    <div class="card form-group">
-      <input v-model="newUser.name" placeholder="Tên user..." />
-      <input v-model="newUser.email" placeholder="Email..." />
-      <button @click="addUser" :disabled="loading">
-        {{ loading ? "Đang gửi..." : "Thêm User" }}
-      </button>
-    </div>
-
-    <!-- List -->
-    <div class="card">
-      <h3>Danh sách Users ({{ users.length }})</h3>
-      <div v-for="user in users" :key="user.id" class="user-item">
-        <span
-          >#{{ user.id }} - <b>{{ user.name }}</b> ({{ user.email }})</span
-        >
-        <button class="del-btn" @click="deleteUser(user.id)">X</button>
+    <!-- Form nộp video -->
+    <div class="card form-section">
+      <h3>🚀 Tạo Project Mới</h3>
+      <div class="input-group">
+        <input
+          v-model="youtubeUrl"
+          placeholder="Dán link YouTube vào đây (VD: https://youtu.be/...)"
+          @keyup.enter="submitJob"
+        />
+        <button @click="submitJob" :disabled="loading" class="primary-btn">
+          {{ loading ? "Đang gửi..." : "Bắt Đầu Xử Lý" }}
+        </button>
       </div>
-      <p v-if="users.length === 0" style="text-align: center; color: #999">
-        Chưa có user nào.
-      </p>
+      <div v-if="notification" class="alert">{{ notification }}</div>
+    </div>
+
+    <!-- Danh sách Jobs -->
+    <div class="card list-section">
+      <h3>📜 Lịch Sử Xử Lý</h3>
+
+      <div v-if="jobs.length === 0" class="empty-state">
+        Chưa có video nào. Hãy thử nhập link bên trên!
+      </div>
+
+      <div v-for="job in jobs" :key="job.id" class="job-item">
+        <div class="job-info">
+          <span class="job-id">#{{ job.id }}</span>
+          <span class="job-url">{{ job.youtube_url }}</span>
+        </div>
+
+        <div class="job-status">
+          <!-- Status Badge -->
+          <span :class="['status-badge', job.status]">
+            {{ job.status.toUpperCase() }}
+          </span>
+
+          <!-- Result Link -->
+          <a
+            v-if="job.result_url"
+            :href="job.result_url"
+            target="_blank"
+            class="download-btn"
+          >
+            ⬇️ Tải Video
+          </a>
+
+          <button class="delete-btn" @click="deleteJob(job.id)">🗑️</button>
+        </div>
+      </div>
     </div>
   </div>
 </template>
 
 <style scoped>
+/* Reset & Base */
 .container {
-  max-width: 600px;
-  margin: 40px auto;
-  font-family: sans-serif;
+  max-width: 800px;
+  margin: 0 auto;
+  padding: 40px 20px;
+  font-family: "Inter", sans-serif;
+  color: #333;
 }
+
+header {
+  text-align: center;
+  margin-bottom: 40px;
+}
+header h1 {
+  font-size: 2.5rem;
+  margin: 0 0 10px 0;
+  background: -webkit-linear-gradient(
+    45deg,
+    #ff3cac 0%,
+    #784ba0 50%,
+    #2b86c5 100%
+  );
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+header p {
+  color: #666;
+  font-size: 1.1rem;
+}
+
+/* Cards */
 .card {
-  background: #fff;
-  padding: 20px;
-  border-radius: 8px;
-  margin-bottom: 20px;
-  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+  background: white;
+  border-radius: 12px;
+  padding: 30px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.05);
+  margin-bottom: 30px;
 }
-.form-group {
+
+/* Form */
+.input-group {
   display: flex;
-  gap: 10px;
+  gap: 15px;
+  margin-top: 20px;
 }
 input {
   flex: 1;
-  padding: 10px;
-  border: 1px solid #ddd;
-  border-radius: 4px;
+  padding: 15px;
+  border: 2px solid #eee;
+  border-radius: 8px;
+  font-size: 16px;
+  transition: border-color 0.3s;
 }
-button {
-  cursor: pointer;
-  background: #2c3e50;
+input:focus {
+  border-color: #784ba0;
+  outline: none;
+}
+.primary-btn {
+  background: #784ba0;
   color: white;
   border: none;
-  padding: 10px 20px;
-  border-radius: 4px;
+  padding: 0 30px;
+  border-radius: 8px;
   font-weight: bold;
+  font-size: 16px;
+  cursor: pointer;
+  transition: transform 0.2s;
 }
-button:hover {
-  background: #34495e;
+.primary-btn:hover {
+  transform: translateY(-2px);
+  background: #6a428d;
 }
-.notification {
-  background: #d4edda;
-  color: #155724;
-  padding: 15px;
-  border-radius: 4px;
-  margin-bottom: 20px;
+.primary-btn:disabled {
+  background: #ccc;
+  cursor: not-allowed;
+  transform: none;
+}
+
+/* Alert */
+.alert {
+  margin-top: 15px;
+  color: #27ae60;
+  background: #eafaf1;
+  padding: 10px;
+  border-radius: 6px;
   text-align: center;
-  border: 1px solid #c3e6cb;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  gap: 10px;
 }
-.spinner {
-  animation: spin 1s linear infinite;
-}
-@keyframes spin {
-  from {
-    transform: rotate(0deg);
-  }
-  to {
-    transform: rotate(360deg);
-  }
-}
-.user-item {
+
+/* Job List */
+.job-item {
   display: flex;
   justify-content: space-between;
-  border-bottom: 1px solid #eee;
-  padding: 10px 0;
   align-items: center;
+  padding: 20px 0;
+  border-bottom: 1px solid #eee;
 }
-.del-btn {
-  background: #e74c3c;
-  padding: 5px 10px;
+.job-info {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  max-width: 60%;
+}
+.job-id {
   font-size: 12px;
+  color: #999;
+  font-weight: bold;
 }
-h3 {
-  margin-top: 0;
+.job-url {
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.job-status {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+}
+
+/* Status Badges */
+.status-badge {
+  font-size: 12px;
+  padding: 5px 10px;
+  border-radius: 20px;
+  font-weight: bold;
+  text-transform: uppercase;
+}
+.status-badge.queued {
+  background: #f39c12;
+  color: white;
+}
+.status-badge.processing {
+  background: #3498db;
+  color: white;
+  animation: pulse 1.5s infinite;
+}
+.status-badge.completed {
+  background: #27ae60;
+  color: white;
+}
+.status-badge.failed {
+  background: #e74c3c;
+  color: white;
+}
+
+@keyframes pulse {
+  0% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.6;
+  }
+  100% {
+    opacity: 1;
+  }
+}
+
+.download-btn {
+  text-decoration: none;
+  color: #27ae60;
+  font-weight: bold;
+  font-size: 14px;
+}
+.delete-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  opacity: 0.5;
+  transition: opacity 0.2s;
+}
+.delete-btn:hover {
+  opacity: 1;
+}
+
+.empty-state {
+  text-align: center;
+  color: #999;
+  padding: 40px;
 }
 </style>

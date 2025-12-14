@@ -10,15 +10,34 @@ const port = process.env.PORT || 3000;
 app.use(cors());
 app.use(express.json());
 
-// 1. Kết nối PostgreSQL (Để Read List)
+// 1. Kết nối PostgreSQL
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
   ssl: { rejectUnauthorized: false },
 });
 
-// 2. Kết nối RabbitMQ (Để Write Async)
+// Init DB Table
+async function initDB() {
+  try {
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS jobs (
+        id SERIAL PRIMARY KEY,
+        youtube_url TEXT NOT NULL,
+        status VARCHAR(20) DEFAULT 'queued',
+        result_url TEXT,
+        created_at TIMESTAMP DEFAULT NOW()
+      );
+    `);
+    console.log("✅ Table 'jobs' ready");
+  } catch (err) {
+    console.error("❌ Init DB Error:", err);
+  }
+}
+initDB();
+
+// 2. Kết nối RabbitMQ
 let channel;
-const QUEUE_NAME = "user_creation_queue";
+const QUEUE_NAME = "video_processing_queue";
 
 async function connectRabbitMQ() {
   try {
@@ -35,43 +54,56 @@ connectRabbitMQ();
 
 // --- API ROUTES ---
 
-// GET: Đọc trực tiếp từ DB (Để nhanh)
-app.get("/users", async (req, res) => {
+// GET: Lấy danh sách Jobs (Polling status)
+app.get("/jobs", async (req, res) => {
   try {
-    const result = await pool.query("SELECT * FROM users ORDER BY id DESC");
+    const result = await pool.query("SELECT * FROM jobs ORDER BY id DESC");
     res.json(result.rows);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
 });
 
-// POST: Gửi sang Worker (Để không tắc server)
-app.post("/users", async (req, res) => {
-  const { name, email } = req.body;
+// POST: Nộp Video YouTube để xử lý
+app.post("/jobs", async (req, res) => {
+  const { youtubeUrl } = req.body;
 
+  if (!youtubeUrl) return res.status(400).json({ error: "Missing youtubeUrl" });
   if (!channel) return res.status(500).json({ error: "Queue not ready" });
 
-  const task = { name, email };
+  try {
+    // 1. Tạo record 'queued' trong DB ngay lập tức
+    const result = await pool.query(
+      "INSERT INTO jobs (youtube_url, status) VALUES ($1, $2) RETURNING id",
+      [youtubeUrl, "queued"]
+    );
+    const jobId = result.rows[0].id;
 
-  // Gửi vào Queue
-  channel.sendToQueue(QUEUE_NAME, Buffer.from(JSON.stringify(task)), {
-    persistent: true,
-  });
-  console.log(`[x] Queued creation for: ${name}`);
+    // 2. Gửi task vào Queue (kèm jobId)
+    const task = { jobId, youtubeUrl };
+    channel.sendToQueue(QUEUE_NAME, Buffer.from(JSON.stringify(task)), {
+      persistent: true,
+    });
+    console.log(`[x] Queued Job #${jobId}: ${youtubeUrl}`);
 
-  // Trả về ngay lập tức
-  res.status(202).json({
-    status: "queued",
-    message: "Yêu cầu tạo User đã được tiếp nhận và đang xử lý ngầm.",
-  });
+    // 3. Trả về ngay cho user
+    res.status(202).json({
+      status: "queued",
+      jobId,
+      message: "Video đã được tiếp nhận và đang xếp hàng xử lý.",
+    });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: "Failed to create job" });
+  }
 });
 
-// DELETE: Tạm thời xóa trực tiếp cho, hoặc cũng đẩy qua queue nếu muốn
-app.delete("/users/:id", async (req, res) => {
+// DELETE: Xóa job
+app.delete("/jobs/:id", async (req, res) => {
   const { id } = req.params;
   try {
-    await pool.query("DELETE FROM users WHERE id = $1", [id]);
-    res.json({ message: "User deleted" });
+    await pool.query("DELETE FROM jobs WHERE id = $1", [id]);
+    res.json({ message: "Job deleted" });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
