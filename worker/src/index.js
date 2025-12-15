@@ -39,17 +39,47 @@ const downloadVideo = (url, outputPath) => {
     // -o outputPath : Output file
     let cmd = `yt-dlp -f "best[ext=mp4]/best" -o "${outputPath}"`;
 
-    // Handle Cookies (Optional - Disabled for now as they are causing 'Invalid' errors)
-    // If we use Android Client, we usually don't need cookies for public videos.
-    /*
+    // Handle Cookies
     if (process.env.YOUTUBE_COOKIES) {
-       // ... (Cookie logic hidden to prevent blocking) ...
-    }
-    */
+      console.log("   --> Processing YouTube Cookies...");
+      try {
+        const cookiePath = path.resolve("./temp/cookies.txt");
+        let cookieData = JSON.parse(process.env.YOUTUBE_COOKIES);
 
-    // POWERFUL FIX: Force 'ios' client.
-    // We remove manual User-Agent to allow yt-dlp to use the correct one for iOS.
-    cmd += ` --extractor-args "youtube:player_client=ios"`;
+        // Handle { url: ..., cookies: [...] } format
+        if (cookieData.cookies && Array.isArray(cookieData.cookies)) {
+          cookieData = cookieData.cookies;
+        }
+
+        // Convert JSON to Netscape format (Required by yt-dlp)
+        let netscapeCookies = "# Netscape HTTP Cookie File\n";
+
+        if (Array.isArray(cookieData)) {
+          cookieData.forEach((c) => {
+            const domain = c.domain || ".youtube.com";
+            const flag = domain.startsWith(".") ? "TRUE" : "FALSE";
+            const path = c.path || "/";
+            const secure = c.secure ? "TRUE" : "FALSE";
+            const expiration = Math.round(
+              c.expirationDate || Date.now() / 1000 + 31536000
+            );
+            const name = c.name;
+            const value = c.value;
+
+            netscapeCookies += `${domain}\t${flag}\t${path}\t${secure}\t${expiration}\t${name}\t${value}\n`;
+          });
+
+          fs.writeFileSync(cookiePath, netscapeCookies);
+          console.log("   --> Cookies written to:", cookiePath);
+
+          cmd += ` --cookies "${cookiePath}"`;
+          // Use standard User Agent matching the browser cookies came from (approx)
+          cmd += ` --user-agent "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"`;
+        }
+      } catch (e) {
+        console.warn("   ⚠️ Failed to process cookies:", e.message);
+      }
+    }
 
     // Add URL at the end
     cmd += ` "${url}"`;
