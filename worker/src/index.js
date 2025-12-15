@@ -46,14 +46,10 @@ const downloadVideo = (url, outputPath) => {
        // ... (Cookie logic hidden to prevent blocking) ...
     }
     */
-    
-    // POWERFUL FIX: Force 'android' client & Mobile User Agent
-    // This combination simulates a real mobile app and bypasses most "Sign in" checks.
-    cmd += ` --extractor-args "youtube:player_client=android"`;
-    cmd += ` --user-agent "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36"`;
 
-    // POWERFUL FIX: Force 'android' client. This uses the Mobile API which often bypasses "Sign in" checks.
-    cmd += ` --extractor-args "youtube:player_client=android"`;
+    // POWERFUL FIX: Force 'ios' client.
+    // We remove manual User-Agent to allow yt-dlp to use the correct one for iOS.
+    cmd += ` --extractor-args "youtube:player_client=ios"`;
 
     // Add URL at the end
     cmd += ` "${url}"`;
