@@ -73,12 +73,17 @@ const downloadVideo = (url, outputPath) => {
           console.log("   --> Cookies written to:", cookiePath);
 
           cmd += ` --cookies "${cookiePath}"`;
-          cmd += ` --user-agent "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"`;
+          cmd += ` --cookies "${cookiePath}"`;
+          // Use Android User Agent
+          cmd += ` --user-agent "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36"`;
         }
       } catch (e) {
         console.warn("   ⚠️ Failed to process cookies:", e.message);
       }
     }
+
+    // POWERFUL FIX: Force 'android' client. This uses the Mobile API which often bypasses "Sign in" checks.
+    cmd += ` --extractor-args "youtube:player_client=android"`;
 
     // Add URL at the end
     cmd += ` "${url}"`;
