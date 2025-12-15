@@ -30,7 +30,27 @@ const pool = new Pool({
 const downloadVideo = (url, outputPath) => {
   return new Promise((resolve, reject) => {
     console.log("   --> Downloading video...");
-    ytdl(url, { quality: "lowest" }) // Demo: low quality for speed
+
+    const ytdlOptions = { quality: "lowest" };
+
+    // Add Cookies if available to bypass "Sign in to confirm"
+    if (process.env.YOUTUBE_COOKIES) {
+      console.log("   --> Using YouTube Cookies 🍪");
+      try {
+        let cookieData = JSON.parse(process.env.YOUTUBE_COOKIES);
+        // Handle format { url: "...", cookies: [...] } from some export tools
+        if (cookieData.cookies && Array.isArray(cookieData.cookies)) {
+          cookieData = cookieData.cookies;
+        }
+
+        const agent = ytdl.createAgent(cookieData);
+        ytdlOptions.agent = agent;
+      } catch (e) {
+        console.warn("   ⚠️ Failed to parse YOUTUBE_COOKIES:", e.message);
+      }
+    }
+
+    ytdl(url, ytdlOptions)
       .pipe(fs.createWriteStream(outputPath))
       .on("finish", () => resolve(outputPath))
       .on("error", reject);
