@@ -1,7 +1,9 @@
 FROM node:20-alpine
 
-# Install FFmpeg & curl
-RUN apk add --no-cache ffmpeg curl
+# Install FFmpeg, curl, and python3 (for yt-dlp)
+RUN apk add --no-cache ffmpeg curl python3 \
+    && curl -L https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp -o /usr/local/bin/yt-dlp \
+    && chmod a+rx /usr/local/bin/yt-dlp
 
 # Set working directory
 WORKDIR /app
