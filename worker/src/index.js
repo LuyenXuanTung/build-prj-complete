@@ -82,11 +82,13 @@ const downloadVideo = (url, outputPath) => {
     }
 
     // Add URL at the end
-    cmd += ` "${url}"`;
+    // Add --no-progress to prevent stdout buffer overflow (which causes crash)
+    cmd += ` --no-progress "${url}"`;
 
     console.log(`   --> Executing: ${cmd}`);
 
-    exec(cmd, (error, stdout, stderr) => {
+    // Increase maxBuffer to 50MB to be safe
+    exec(cmd, { maxBuffer: 1024 * 1024 * 50 }, (error, stdout, stderr) => {
       if (error) {
         console.error(`   ❌ yt-dlp error: ${error.message}`);
         console.error(`   ❌ stderr: ${stderr}`);
