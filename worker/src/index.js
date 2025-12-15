@@ -37,38 +37,51 @@ const downloadVideo = (url, outputPath) => {
     // -f "b[ext=mp4]" : Best quality mp4 (or just "b" for best) -> "bv*+ba/b" is default
     // -f "best[ext=mp4]/best" : Try to get mp4 directly
     // -o outputPath : Output file
-    let cmd = `yt-dlp -f "best[ext=mp4]/best" -o "${outputPath}" "${url}"`;
+    let cmd = `yt-dlp -f "best[ext=mp4]/best" -o "${outputPath}"`;
 
-    // Add Cookies if present
+    // Handle Cookies
     if (process.env.YOUTUBE_COOKIES) {
-      console.log("   --> Using YouTube Cookies 🍪");
-      // Write cookies to temp file because yt-dlp needs a file
-      const cookiePath = path.resolve("./temp/cookies.txt");
+      console.log("   --> Processing YouTube Cookies...");
       try {
-        // If JSON, convert to Netscape format? No, yt-dlp supports JSON cookies in some versions,
-        // but Netscape is safer. Or just pass user-agent.
-        // Actually, if we just paste the JSON content into a file, yt-dlp might complain if it expects Netscape.
-        // BUT: The user provided a JSON from "EditThisCookie" or similar.
-        // Let's try to just ignore cookies for a moment OR construct a basic Netscape format if we can.
-        // Simpler: Just try without cookies first? No, user explicitly has them.
-        // Safer bet: Pass '--cookies-from-browser firefox' ? No, we are in docker.
-        // Let's just try to write the content to file.
-        // NOTE: yt-dlp really prefers Netscape format cookies.txt. JSON might fail.
-        // However, bypassing with client='android' or 'ios' is often enough without cookies.
-        // Let's try forcing the client first in the command line args.
-      } catch (e) {}
+        const cookiePath = path.resolve("./temp/cookies.txt");
+        let cookieData = JSON.parse(process.env.YOUTUBE_COOKIES);
+
+        // Handle { url: ..., cookies: [...] } format
+        if (cookieData.cookies && Array.isArray(cookieData.cookies)) {
+          cookieData = cookieData.cookies;
+        }
+
+        // Convert JSON to Netscape format (Required by yt-dlp)
+        let netscapeCookies = "# Netscape HTTP Cookie File\n";
+
+        if (Array.isArray(cookieData)) {
+          cookieData.forEach((c) => {
+            const domain = c.domain || ".youtube.com";
+            const flag = domain.startsWith(".") ? "TRUE" : "FALSE";
+            const path = c.path || "/";
+            const secure = c.secure ? "TRUE" : "FALSE";
+            const expiration = Math.round(
+              c.expirationDate || Date.now() / 1000 + 31536000
+            );
+            const name = c.name;
+            const value = c.value;
+
+            netscapeCookies += `${domain}\t${flag}\t${path}\t${secure}\t${expiration}\t${name}\t${value}\n`;
+          });
+
+          fs.writeFileSync(cookiePath, netscapeCookies);
+          console.log("   --> Cookies written to:", cookiePath);
+
+          cmd += ` --cookies "${cookiePath}"`;
+          cmd += ` --user-agent "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"`;
+        }
+      } catch (e) {
+        console.warn("   ⚠️ Failed to process cookies:", e.message);
+      }
     }
 
-    // POWERFUL FIX: Use "android" client to bypass restrictions
-    // yt-dlp automatically handles this better than ytdl-core
-    // Just run it.
-
-    // If we want to use cookies, we really need to write them to a file.
-    // For now, let's try just running yt-dlp which is very robust.
-    // We can add --cookies later if needed, but parsing JSON to Netscape is complex in 1 line.
-
-    // UPDATE: To ensure we bypass "Bot" Check, let's spoof User Agent and use Android Client
-    // cmd += ` --user-agent "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"`;
+    // Add URL at the end
+    cmd += ` "${url}"`;
 
     console.log(`   --> Executing: ${cmd}`);
 
