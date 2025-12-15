@@ -39,48 +39,18 @@ const downloadVideo = (url, outputPath) => {
     // -o outputPath : Output file
     let cmd = `yt-dlp -f "best[ext=mp4]/best" -o "${outputPath}"`;
 
-    // Handle Cookies
+    // Handle Cookies (Optional - Disabled for now as they are causing 'Invalid' errors)
+    // If we use Android Client, we usually don't need cookies for public videos.
+    /*
     if (process.env.YOUTUBE_COOKIES) {
-      console.log("   --> Processing YouTube Cookies...");
-      try {
-        const cookiePath = path.resolve("./temp/cookies.txt");
-        let cookieData = JSON.parse(process.env.YOUTUBE_COOKIES);
-
-        // Handle { url: ..., cookies: [...] } format
-        if (cookieData.cookies && Array.isArray(cookieData.cookies)) {
-          cookieData = cookieData.cookies;
-        }
-
-        // Convert JSON to Netscape format (Required by yt-dlp)
-        let netscapeCookies = "# Netscape HTTP Cookie File\n";
-
-        if (Array.isArray(cookieData)) {
-          cookieData.forEach((c) => {
-            const domain = c.domain || ".youtube.com";
-            const flag = domain.startsWith(".") ? "TRUE" : "FALSE";
-            const path = c.path || "/";
-            const secure = c.secure ? "TRUE" : "FALSE";
-            const expiration = Math.round(
-              c.expirationDate || Date.now() / 1000 + 31536000
-            );
-            const name = c.name;
-            const value = c.value;
-
-            netscapeCookies += `${domain}\t${flag}\t${path}\t${secure}\t${expiration}\t${name}\t${value}\n`;
-          });
-
-          fs.writeFileSync(cookiePath, netscapeCookies);
-          console.log("   --> Cookies written to:", cookiePath);
-
-          cmd += ` --cookies "${cookiePath}"`;
-          cmd += ` --cookies "${cookiePath}"`;
-          // Use Android User Agent
-          cmd += ` --user-agent "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36"`;
-        }
-      } catch (e) {
-        console.warn("   ⚠️ Failed to process cookies:", e.message);
-      }
+       // ... (Cookie logic hidden to prevent blocking) ...
     }
+    */
+    
+    // POWERFUL FIX: Force 'android' client & Mobile User Agent
+    // This combination simulates a real mobile app and bypasses most "Sign in" checks.
+    cmd += ` --extractor-args "youtube:player_client=android"`;
+    cmd += ` --user-agent "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36"`;
 
     // POWERFUL FIX: Force 'android' client. This uses the Mobile API which often bypasses "Sign in" checks.
     cmd += ` --extractor-args "youtube:player_client=android"`;
