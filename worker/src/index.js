@@ -139,7 +139,8 @@ const analyzeVideoContent = async (audioPath) => {
       },
       { role: "user", content: text },
     ],
-    model: "gpt-4",
+    // "gpt-4" does not support JSON mode. We must use "gpt-4-turbo" or "gpt-4-0125-preview"
+    model: "gpt-4-turbo-preview",
     response_format: { type: "json_object" },
   });
 
