@@ -5,7 +5,6 @@ A full-stack web application demonstrating **asynchronous processing** with Rabb
 ## 🚀 Live Demo
 
 - **Frontend**: https://build-prj-finished.netlify.app
-- **Backend API**: https://build-prj-api.onrender.com
 
 ## 📋 Features
 
